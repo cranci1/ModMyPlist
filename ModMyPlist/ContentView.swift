@@ -27,30 +27,62 @@ struct ContentView: View {
     @State private var bundleVersion = ""
     @State private var bundleShortVersion = ""
     
+    var hasArcadeKey: Bool {
+        guard let plistData = plistData else { return false }
+        return plistData["NSApplicationRequiresArcade"] != nil
+    }
+    
     var body: some View {
         NavigationView {
             VStack {
                 if ipaURL == nil {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 24) {
                         Image(systemName: "doc.zipper")
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(width: 80, height: 80)
+                            .frame(width: 120, height: 120)
                             .foregroundColor(.blue)
+                            .shadow(color: .blue.opacity(0.3), radius: 10)
                         
                         Text("Select an IPA file to modify")
-                            .font(.headline)
+                            .font(.title2)
+                            .fontWeight(.semibold)
                         
-                        Button("Select IPA File") {
+                        Button(action: {
                             isShowingDocumentPicker = true
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Select IPA File")
+                            }
+                            .font(.headline)
+                            .padding(.horizontal, 40)
+                            .padding(.vertical, 16)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                            .shadow(color: .blue.opacity(0.3), radius: 5)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .padding()
+                        
+                        Spacer()
+                        
+                        VStack(spacing: 4) {
+                            Text("ModMyPlist v1.0, © cranci1, GPL v3.0")
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.bottom, 16)
                     }
                     .padding()
                 } else if isLoading {
-                    ProgressView("Processing...")
-                        .progressViewStyle(CircularProgressViewStyle())
+                    VStack {
+                        ProgressView("Processing...")
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(1.2)
+                            .padding()
+                        Text("Please wait...")
+                            .foregroundColor(.secondary)
+                    }
                 } else if isEditingRawPlist {
                     VStack(spacing: 0) {
                         HStack {
@@ -119,23 +151,58 @@ struct ContentView: View {
                 } else if plistData != nil {
                     Form {
                         Section(header: Text("IPA File")) {
-                            Text(ipaURL?.lastPathComponent ?? "")
-                                .font(.subheadline)
+                            HStack {
+                                Image(systemName: "doc.fill")
+                                    .foregroundColor(.blue)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(ipaURL?.lastPathComponent ?? "")
+                                        .font(.headline)
+                                    Text("Ready to modify")
+                                        .font(.caption)
+                                        .foregroundColor(.green)
+                                }
+                            }
+                            .padding(.vertical, 8)
                         }
                         
                         Section(header: Text("Bundle Info")) {
-                            TextField("Bundle ID", text: $bundleIdentifier)
-                            TextField("Bundle Name", text: $bundleName)
-                            TextField("Version", text: $bundleVersion)
-                            TextField("Short Version", text: $bundleShortVersion)
+                            HStack {
+                                Image(systemName: "textformat.alt")
+                                    .foregroundColor(.gray)
+                                    .frame(width: 24)
+                                TextField("Bundle ID", text: $bundleIdentifier)
+                            }
+                            
+                            HStack {
+                                Image(systemName: "tag")
+                                    .foregroundColor(.gray)
+                                    .frame(width: 24)
+                                TextField("Bundle Name", text: $bundleName)
+                            }
+                            
+                            HStack {
+                                Image(systemName: "number")
+                                    .foregroundColor(.gray)
+                                    .frame(width: 24)
+                                TextField("Version", text: $bundleVersion)
+                            }
+                            
+                            HStack {
+                                Image(systemName: "123.rectangle")
+                                    .foregroundColor(.gray)
+                                    .frame(width: 24)
+                                TextField("Short Version", text: $bundleShortVersion)
+                            }
                         }
                         
-                        Section(header: Text("Auto Patches")) {
-                            Button("Patch Arcade Games") {
-                                applyArcadePatch()
+                        if hasArcadeKey {
+                            Section(header: Text("Auto Patches")) {
+                                Button("Patch Arcade Games") {
+                                    applyArcadePatch()
+                                }
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .foregroundColor(.blue)
                             }
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .foregroundColor(.blue)
                         }
                         
                         Section {
