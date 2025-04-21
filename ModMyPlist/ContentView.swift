@@ -88,7 +88,7 @@ struct ContentView: View {
                             .progressViewStyle(CircularProgressViewStyle())
                             .scaleEffect(1.2)
                             .padding()
-                        Text("Please wait...")
+                        Text("Please wait a few seconds...")
                             .foregroundColor(.secondary)
                     }
                 } else if isEditingRawPlist {
@@ -235,7 +235,6 @@ struct ContentView: View {
                                         Spacer()
                                     }
                                 }
-                                .frame(maxWidth: .infinity, alignment: .center)
                             }
                         }
                         
@@ -243,29 +242,24 @@ struct ContentView: View {
                             Button("Edit Raw Info.plist") {
                                 prepareRawPlistEditor()
                             }
-                            .frame(maxWidth: .infinity, alignment: .center)
                         }
                         
                         Section {
                             Button("Save Changes") {
                                 saveChanges()
                             }
-                            .frame(maxWidth: .infinity, alignment: .center)
                             .foregroundColor(.green)
                             
                             if modifiedIpaURL != nil {
                                 Button("Share Modified IPA") {
                                     isShowingShareSheet = true
                                 }
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                
                                 .foregroundColor(.red)
                             }
                             
                             Button("Start Over") {
                                 resetState()
                             }
-                            .frame(maxWidth: .infinity, alignment: .center)
                             .foregroundColor(.red)
                         }
                     }
