@@ -2,7 +2,7 @@ name: Build and Release IPA
 on:
   push:
     branches:
-      - dev
+      - main
 jobs:
   build:
     name: Build IPA
