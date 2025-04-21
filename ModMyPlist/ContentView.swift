@@ -26,7 +26,7 @@ struct ContentView: View {
     @State private var bundleName = ""
     @State private var bundleVersion = ""
     @State private var bundleShortVersion = ""
-
+    
     var body: some View {
         NavigationView {
             VStack {
@@ -52,32 +52,70 @@ struct ContentView: View {
                     ProgressView("Processing...")
                         .progressViewStyle(CircularProgressViewStyle())
                 } else if isEditingRawPlist {
-                    VStack {
-                        Text("Edit Info.plist")
-                            .font(.headline)
-                            .padding(.top)
-                        
-                        TextEditor(text: $rawPlistText)
-                            .font(.system(size: 14, design: .monospaced))
-                            .border(Color.gray.opacity(0.2))
-                            .padding()
-                        
+                    VStack(spacing: 0) {
                         HStack {
-                            Button("Cancel") {
-                                isEditingRawPlist = false
-                            }
-                            .foregroundColor(.red)
-                            
+                            Text("Edit Info.plist")
+                                .font(.title2)
+                                .fontWeight(.bold)
                             Spacer()
+                            Button(action: { isEditingRawPlist = false }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                                    .imageScale(.large)
+                            }
+                        }
+                        .padding()
+                        .background(Color(UIColor.systemBackground))
+                        
+                        ScrollView {
+                            VStack(alignment: .leading) {
+                                Text("Raw XML")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
+                                
+                                TextEditor(text: $rawPlistText)
+                                    .font(.system(size: 14, design: .monospaced))
+                                    .frame(minHeight: 300)
+                                    .padding(8)
+                                    .background(Color(UIColor.systemGray6))
+                                    .cornerRadius(8)
+                                    .padding(.horizontal)
+                                
+                                Text("Note: Be careful when editing raw XML. Invalid changes may cause issues.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
+                                    .padding(.top, 4)
+                            }
+                        }
+                        .padding(.vertical)
+                        
+                        Divider()
+                        
+                        HStack(spacing: 16) {
+                            Button(action: { isEditingRawPlist = false }) {
+                                Text("Cancel")
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.red)
                             
-                            Button("Save") {
+                            Button(action: {
                                 saveRawPlist()
                                 isEditingRawPlist = false
+                            }) {
+                                Text("Save Changes")
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
                             }
                             .buttonStyle(.borderedProminent)
                         }
                         .padding()
+                        .background(Color(UIColor.systemBackground))
                     }
+                    .background(Color(UIColor.systemGroupedBackground))
                 } else if plistData != nil {
                     Form {
                         Section(header: Text("IPA File")) {
@@ -90,6 +128,14 @@ struct ContentView: View {
                             TextField("Bundle Name", text: $bundleName)
                             TextField("Version", text: $bundleVersion)
                             TextField("Short Version", text: $bundleShortVersion)
+                        }
+                        
+                        Section(header: Text("Auto Patches")) {
+                            Button("Patch Arcade Games") {
+                                applyArcadePatch()
+                            }
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .foregroundColor(.blue)
                         }
                         
                         Section {
@@ -314,6 +360,14 @@ struct ContentView: View {
         bundleShortVersion = ""
         rawPlistText = ""
         isEditingRawPlist = false
+    }
+    
+    func applyArcadePatch() {
+        guard var currentPlist = plistData else { return }
+        currentPlist["NSApplicationRequiresArcade"] = false
+        
+        plistData = currentPlist
+        saveChanges()
     }
 }
 
