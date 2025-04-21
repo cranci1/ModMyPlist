@@ -32,6 +32,14 @@ struct ContentView: View {
         return plistData["NSApplicationRequiresArcade"] != nil
     }
     
+    var isArcadePatched: Bool {
+        guard let plistData = plistData,
+              let arcadeValue = plistData["NSApplicationRequiresArcade"] as? Bool else {
+            return false
+        }
+        return !arcadeValue
+    }
+    
     var body: some View {
         NavigationView {
             VStack {
@@ -41,8 +49,8 @@ struct ContentView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 120, height: 120)
-                            .foregroundColor(.blue)
-                            .shadow(color: .blue.opacity(0.3), radius: 10)
+                            .foregroundColor(Color.accentColor)
+                            .shadow(color: .accentColor.opacity(0.3), radius: 10)
                         
                         Text("Select an IPA file to modify")
                             .font(.title2)
@@ -58,10 +66,10 @@ struct ContentView: View {
                             .font(.headline)
                             .padding(.horizontal, 40)
                             .padding(.vertical, 16)
-                            .background(Color.blue)
+                            .background(Color.accentColor)
                             .foregroundColor(.white)
                             .cornerRadius(12)
-                            .shadow(color: .blue.opacity(0.3), radius: 5)
+                            .shadow(color: .accentColor.opacity(0.3), radius: 5)
                         }
                         
                         Spacer()
@@ -153,11 +161,11 @@ struct ContentView: View {
                         Section(header: Text("IPA File")) {
                             HStack {
                                 Image(systemName: "doc.fill")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.accentColor)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(ipaURL?.lastPathComponent ?? "")
                                         .font(.headline)
-                                    Text("Ready to modify")
+                                    Text("Ready to be modified")
                                         .font(.caption)
                                         .foregroundColor(.green)
                                 }
@@ -170,38 +178,64 @@ struct ContentView: View {
                                 Image(systemName: "textformat.alt")
                                     .foregroundColor(.gray)
                                     .frame(width: 24)
-                                TextField("Bundle ID", text: $bundleIdentifier)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text("Bundle ID")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                    TextField("Bundle ID", text: $bundleIdentifier)
+                                }
                             }
                             
                             HStack {
                                 Image(systemName: "tag")
                                     .foregroundColor(.gray)
                                     .frame(width: 24)
-                                TextField("Bundle Name", text: $bundleName)
-                            }
-                            
-                            HStack {
-                                Image(systemName: "number")
-                                    .foregroundColor(.gray)
-                                    .frame(width: 24)
-                                TextField("Version", text: $bundleVersion)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text("Bundle Name")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                    TextField("Bundle Name", text: $bundleName)
+                                }
                             }
                             
                             HStack {
                                 Image(systemName: "123.rectangle")
                                     .foregroundColor(.gray)
                                     .frame(width: 24)
-                                TextField("Short Version", text: $bundleShortVersion)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text("Version")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                    TextField("Version", text: $bundleShortVersion)
+                                }
+                            }
+                            
+                            HStack {
+                                Image(systemName: "number")
+                                    .foregroundColor(.gray)
+                                    .frame(width: 24)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text("Build")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                    TextField("Build", text: $bundleVersion)
+                                }
                             }
                         }
                         
                         if hasArcadeKey {
                             Section(header: Text("Auto Patches")) {
-                                Button("Patch Arcade Games") {
+                                Button(action: {
                                     applyArcadePatch()
+                                }) {
+                                    HStack {
+                                        Image(systemName: isArcadePatched ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                            .foregroundColor(isArcadePatched ? .green : .red)
+                                        Text("Patch Arcade Game")
+                                        Spacer()
+                                    }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .center)
-                                .foregroundColor(.blue)
                             }
                         }
                         
@@ -210,7 +244,6 @@ struct ContentView: View {
                                 prepareRawPlistEditor()
                             }
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .foregroundColor(.blue)
                         }
                         
                         Section {
@@ -218,12 +251,15 @@ struct ContentView: View {
                                 saveChanges()
                             }
                             .frame(maxWidth: .infinity, alignment: .center)
+                            .foregroundColor(.green)
                             
                             if modifiedIpaURL != nil {
                                 Button("Share Modified IPA") {
                                     isShowingShareSheet = true
                                 }
                                 .frame(maxWidth: .infinity, alignment: .center)
+                                
+                                .foregroundColor(.red)
                             }
                             
                             Button("Start Over") {
