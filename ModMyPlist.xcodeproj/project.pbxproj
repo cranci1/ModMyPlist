@@ -12,6 +12,7 @@
 		1337E1D32DB63FD400B17D2F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1337E1D22DB63FD400B17D2F /* Assets.xcassets */; };
 		1337E1D62DB63FD400B17D2F /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1337E1D52DB63FD400B17D2F /* Preview Assets.xcassets */; };
 		1337E1DE2DB6411B00B17D2F /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 1337E1DD2DB6411B00B17D2F /* ZIPFoundation */; };
+		13A8B4A82DB7C87A0053EFAD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13A8B4A72DB7C87A0053EFAD /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,6 +22,7 @@
 		1337E1D22DB63FD400B17D2F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1337E1D52DB63FD400B17D2F /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		1337E1E12DB6429700B17D2F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		13A8B4A72DB7C87A0053EFAD /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,6 +57,7 @@
 			isa = PBXGroup;
 			children = (
 				1337E1CE2DB63FD200B17D2F /* ModMyPlistApp.swift */,
+				13A8B4A72DB7C87A0053EFAD /* SettingsView.swift */,
 				1337E1D02DB63FD200B17D2F /* ContentView.swift */,
 				1337E1D22DB63FD400B17D2F /* Assets.xcassets */,
 				1337E1D42DB63FD400B17D2F /* Preview Content */,
@@ -147,6 +150,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				13A8B4A82DB7C87A0053EFAD /* SettingsView.swift in Sources */,
 				1337E1D12DB63FD200B17D2F /* ContentView.swift in Sources */,
 				1337E1CF2DB63FD200B17D2F /* ModMyPlistApp.swift in Sources */,
 			);

@@ -27,6 +27,10 @@ struct ContentView: View {
     @State private var bundleVersion = ""
     @State private var bundleShortVersion = ""
     
+    @StateObject private var settings = Settings()
+    @State private var isShowingSettings = false
+    @State private var outputMessages: [String] = []
+    
     var hasArcadeKey: Bool {
         guard let plistData = plistData else { return false }
         return plistData["NSApplicationRequiresArcade"] != nil
@@ -84,7 +88,7 @@ struct ContentView: View {
                     .padding()
                 } else if isLoading {
                     VStack {
-                        ProgressView("Processing...")
+                        ProgressView(processMessage)
                             .progressViewStyle(CircularProgressViewStyle())
                             .scaleEffect(1.2)
                             .padding()
@@ -262,10 +266,35 @@ struct ContentView: View {
                             }
                             .foregroundColor(.red)
                         }
+                        
+                        if settings.showOutputView {
+                            Section(header: Text("Output Log")) {
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        ForEach(outputMessages, id: \.self) { message in
+                                            Text(message)
+                                                .font(.system(.footnote, design: .monospaced))
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .frame(maxHeight: 200)
+                            }
+                        }
                     }
                 }
             }
             .navigationTitle("ModMyPlist")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { isShowingSettings = true }) {
+                        Image(systemName: "gear")
+                    }
+                }
+            }
+            .sheet(isPresented: $isShowingSettings) {
+                SettingsView(settings: settings)
+            }
             .sheet(isPresented: $isShowingDocumentPicker) {
                 DocumentPicker(selectedURL: $ipaURL, onSelection: processIPA)
             }
@@ -346,6 +375,7 @@ struct ContentView: View {
         guard let ipaURL = ipaURL else { return }
         
         isLoading = true
+        addOutputMessage("Processing IPA file: \(ipaURL.lastPathComponent)")
         
         DispatchQueue.global(qos: .userInitiated).async {
             do {
@@ -396,6 +426,7 @@ struct ContentView: View {
         guard let extractedPath = extractedPath else { return }
         
         isLoading = true
+        addOutputMessage("Saving changes...")
         
         DispatchQueue.global(qos: .userInitiated).async {
             do {
@@ -427,6 +458,7 @@ struct ContentView: View {
                 DispatchQueue.main.async {
                     modifiedIpaURL = newIpaURL
                     isLoading = false
+                    addOutputMessage("Changes saved successfully")
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -461,10 +493,26 @@ struct ContentView: View {
     
     func applyArcadePatch() {
         guard var currentPlist = plistData else { return }
-        currentPlist["NSApplicationRequiresArcade"] = false
         
+        isLoading = true
+        addOutputMessage("Applying Arcade patch...")
+        
+        currentPlist["NSApplicationRequiresArcade"] = false
         plistData = currentPlist
+        
+        addOutputMessage("Arcade patch applied successfully")
         saveChanges()
+    }
+    
+    func addOutputMessage(_ message: String) {
+        outputMessages.append("\(Date().formatted(date: .omitted, time: .standard)): \(message)")
+    }
+    
+    var processMessage: String {
+        if hasArcadeKey && isArcadePatched {
+            return "Applying patch..."
+        }
+        return "Processing..."
     }
 }
 
