@@ -9,6 +9,52 @@ import SwiftUI
 import ZIPFoundation
 import UniformTypeIdentifiers
 
+struct GlassBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial)
+            .cornerRadius(16)
+            .shadow(radius: 5)
+    }
+}
+
+struct ProcessingError: LocalizedError {
+    let description: String
+    
+    var errorDescription: String? {
+        description
+    }
+    
+    static let invalidIPA = ProcessingError(description: "The selected file is not a valid IPA")
+    static let missingInfoPlist = ProcessingError(description: "Could not find Info.plist in the IPA")
+    static let invalidInfoPlist = ProcessingError(description: "The Info.plist file is corrupted or invalid")
+    static let extractionFailed = ProcessingError(description: "Failed to extract the IPA file")
+}
+
+struct PrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding()
+            .background(Color.accentColor)
+            .foregroundColor(.white)
+            .cornerRadius(12)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
+struct SecondaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding()
+            .background(Color.secondary.opacity(0.1))
+            .foregroundColor(.primary)
+            .cornerRadius(12)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
 struct ContentView: View {
     @State private var ipaURL: URL?
     @State private var extractedPath: URL?
@@ -31,6 +77,9 @@ struct ContentView: View {
     @State private var isShowingSettings = false
     @State private var outputMessages: [String] = []
     
+    @State private var processingProgress: Double = 0
+    @State private var processingStage: String = ""
+    
     var hasArcadeKey: Bool {
         guard let plistData = plistData else { return false }
         return plistData["NSApplicationRequiresArcade"] != nil
@@ -48,239 +97,25 @@ struct ContentView: View {
         NavigationView {
             VStack {
                 if ipaURL == nil {
-                    VStack(spacing: 24) {
-                        Image(systemName: "doc.zipper")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 120, height: 120)
-                            .foregroundColor(Color.accentColor)
-                            .shadow(color: .accentColor.opacity(0.3), radius: 10)
-                        
-                        Text("Select an IPA file to modify")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        
-                        Button(action: {
-                            isShowingDocumentPicker = true
-                        }) {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                Text("Select IPA File")
-                            }
-                            .font(.headline)
-                            .padding(.horizontal, 40)
-                            .padding(.vertical, 16)
-                            .background(Color.accentColor)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
-                            .shadow(color: .accentColor.opacity(0.3), radius: 5)
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(spacing: 4) {
-                            Text("ModMyPlist v1.0, © cranci1, GPL v3.0")
-                                .font(.footnote)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.bottom, 16)
-                    }
-                    .padding()
+                    welcomeView
                 } else if isLoading {
-                    VStack {
-                        ProgressView(processMessage)
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .scaleEffect(1.2)
-                            .padding()
-                        Text("Please wait a few seconds...")
-                            .foregroundColor(.secondary)
-                    }
+                    loadingView
                 } else if isEditingRawPlist {
-                    VStack(spacing: 0) {
-                        HStack {
-                            Text("Edit Info.plist")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            Spacer()
-                            Button(action: { isEditingRawPlist = false }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.gray)
-                                    .imageScale(.large)
-                            }
-                        }
-                        .padding()
-                        .background(Color(UIColor.systemBackground))
-                        
-                        ScrollView {
-                            VStack(alignment: .leading) {
-                                Text("Raw XML")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal)
-                                
-                                TextEditor(text: $rawPlistText)
-                                    .font(.system(size: 14, design: .monospaced))
-                                    .frame(minHeight: 300)
-                                    .padding(8)
-                                    .background(Color(UIColor.systemGray6))
-                                    .cornerRadius(8)
-                                    .padding(.horizontal)
-                                
-                                Text("Note: Be careful when editing raw XML. Invalid changes may cause issues.")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal)
-                                    .padding(.top, 4)
-                            }
-                        }
-                        .padding(.vertical)
-                        
-                        Divider()
-                        
-                        HStack(spacing: 16) {
-                            Button(action: { isEditingRawPlist = false }) {
-                                Text("Cancel")
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(.red)
-                            
-                            Button(action: {
-                                saveRawPlist()
-                                isEditingRawPlist = false
-                            }) {
-                                Text("Save Changes")
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
-                        .padding()
-                        .background(Color(UIColor.systemBackground))
-                    }
-                    .background(Color(UIColor.systemGroupedBackground))
+                    rawPlistEditorView
                 } else if plistData != nil {
-                    Form {
-                        Section(header: Text("IPA File")) {
-                            HStack {
-                                Image(systemName: "doc.fill")
-                                    .foregroundColor(.accentColor)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(ipaURL?.lastPathComponent ?? "")
-                                        .font(.headline)
-                                    Text("Ready to be modified")
-                                        .font(.caption)
-                                        .foregroundColor(.green)
-                                }
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            ipaInfoCard
+                            bundleInfoCard
+                            if hasArcadeKey {
+                                arcadePatchCard
                             }
-                            .padding(.vertical, 8)
-                        }
-                        
-                        Section(header: Text("Bundle Info")) {
-                            HStack {
-                                Image(systemName: "textformat.alt")
-                                    .foregroundColor(.gray)
-                                    .frame(width: 24)
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text("Bundle ID")
-                                        .foregroundColor(.secondary)
-                                        .font(.caption)
-                                    TextField("Bundle ID", text: $bundleIdentifier)
-                                }
-                            }
-                            
-                            HStack {
-                                Image(systemName: "tag")
-                                    .foregroundColor(.gray)
-                                    .frame(width: 24)
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text("Bundle Name")
-                                        .foregroundColor(.secondary)
-                                        .font(.caption)
-                                    TextField("Bundle Name", text: $bundleName)
-                                }
-                            }
-                            
-                            HStack {
-                                Image(systemName: "123.rectangle")
-                                    .foregroundColor(.gray)
-                                    .frame(width: 24)
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text("Version")
-                                        .foregroundColor(.secondary)
-                                        .font(.caption)
-                                    TextField("Version", text: $bundleShortVersion)
-                                }
-                            }
-                            
-                            HStack {
-                                Image(systemName: "number")
-                                    .foregroundColor(.gray)
-                                    .frame(width: 24)
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text("Build")
-                                        .foregroundColor(.secondary)
-                                        .font(.caption)
-                                    TextField("Build", text: $bundleVersion)
-                                }
+                            actionsCard
+                            if settings.showOutputView {
+                                outputLogCard
                             }
                         }
-                        
-                        if hasArcadeKey {
-                            Section(header: Text("Auto Patches")) {
-                                Button(action: {
-                                    applyArcadePatch()
-                                }) {
-                                    HStack {
-                                        Image(systemName: isArcadePatched ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                            .foregroundColor(isArcadePatched ? .green : .red)
-                                        Text("Patch Arcade Game")
-                                        Spacer()
-                                    }
-                                }
-                            }
-                        }
-                        
-                        Section {
-                            Button("Edit Raw Info.plist") {
-                                prepareRawPlistEditor()
-                            }
-                        }
-                        
-                        Section {
-                            Button("Save Changes") {
-                                saveChanges()
-                            }
-                            .foregroundColor(.green)
-                            
-                            if modifiedIpaURL != nil {
-                                Button("Share Modified IPA") {
-                                    isShowingShareSheet = true
-                                }
-                                .foregroundColor(.red)
-                            }
-                            
-                            Button("Start Over") {
-                                resetState()
-                            }
-                            .foregroundColor(.red)
-                        }
-                        
-                        if settings.showOutputView {
-                            Section(header: Text("Output Log")) {
-                                ScrollView {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        ForEach(outputMessages, id: \.self) { message in
-                                            Text(message)
-                                                .font(.system(.footnote, design: .monospaced))
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                .frame(maxHeight: 200)
-                            }
-                        }
+                        .padding()
                     }
                 }
             }
@@ -289,6 +124,7 @@ struct ContentView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { isShowingSettings = true }) {
                         Image(systemName: "gear")
+                            .imageScale(.large)
                     }
                 }
             }
@@ -309,6 +145,295 @@ struct ContentView: View {
                 Text(errorMessage)
             }
         }
+    }
+    
+    private var welcomeView: some View {
+        VStack(spacing: 30) {
+            Spacer()
+            
+            VStack(spacing: 24) {
+                Image(systemName: "doc.zipper")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 120, height: 120)
+                    .foregroundStyle(.quaternary)
+                    .overlay {
+                        Image(systemName: "plus.circle.fill")
+                            .resizable()
+                            .frame(width: 40, height: 40)
+                            .foregroundColor(.accentColor)
+                            .background(.background)
+                            .clipShape(Circle())
+                            .offset(x: 30, y: 30)
+                    }
+                
+                Text("Select an IPA file to modify")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                
+                Button(action: { isShowingDocumentPicker = true }) {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Select IPA File")
+                    }
+                    .font(.headline)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+            }
+            .padding()
+            
+            Spacer()
+            
+            VStack(spacing: 4) {
+                Text("ModMyPlist v1.0")
+                    .font(.headline)
+                Text("© cranci1, GPL v3.0")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.bottom)
+        }
+    }
+    
+    private var loadingView: some View {
+        VStack(spacing: 20) {
+            ProgressView(value: processingProgress, total: 1.0)
+                .progressViewStyle(.circular)
+                .scaleEffect(1.5)
+            
+            Text(processingStage)
+                .font(.headline)
+            
+            Text("Please wait...")
+                .foregroundColor(.secondary)
+        }
+        .padding()
+    }
+    
+    private var rawPlistEditorView: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Edit Info.plist")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Spacer()
+                Button(action: { isEditingRawPlist = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                        .imageScale(.large)
+                }
+            }
+            .padding()
+            .background(Color(UIColor.systemBackground))
+            
+            ScrollView {
+                VStack(alignment: .leading) {
+                    Text("Raw XML")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                    
+                    TextEditor(text: $rawPlistText)
+                        .font(.system(size: 14, design: .monospaced))
+                        .frame(minHeight: 300)
+                        .padding(8)
+                        .background(Color(UIColor.systemGray6))
+                        .cornerRadius(8)
+                        .padding(.horizontal)
+                    
+                    Text("Note: Be careful when editing raw XML. Invalid changes may cause issues.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top, 4)
+                }
+            }
+            .padding(.vertical)
+            
+            Divider()
+            
+            HStack(spacing: 16) {
+                Button(action: { isEditingRawPlist = false }) {
+                    Text("Cancel")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                
+                Button(action: {
+                    saveRawPlist()
+                    isEditingRawPlist = false
+                }) {
+                    Text("Save Changes")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding()
+            .background(Color(UIColor.systemBackground))
+        }
+        .background(Color(UIColor.systemGroupedBackground))
+    }
+    
+    private var ipaInfoCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "doc.fill")
+                    .foregroundColor(.accentColor)
+                Text("IPA File")
+                    .font(.headline)
+            }
+            
+            Divider()
+            
+            Text(ipaURL?.lastPathComponent ?? "")
+                .font(.system(.body, design: .monospaced))
+            
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                Text("Ready to modify")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .modifier(GlassBackground())
+    }
+    
+    private var bundleInfoCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "textformat.alt")
+                    .foregroundColor(.gray)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Bundle ID")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    TextField("Bundle ID", text: $bundleIdentifier)
+                }
+            }
+            
+            HStack {
+                Image(systemName: "tag")
+                    .foregroundColor(.gray)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Bundle Name")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    TextField("Bundle Name", text: $bundleName)
+                }
+            }
+            
+            HStack {
+                Image(systemName: "123.rectangle")
+                    .foregroundColor(.gray)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Version")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    TextField("Version", text: $bundleShortVersion)
+                }
+            }
+            
+            HStack {
+                Image(systemName: "number")
+                    .foregroundColor(.gray)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Build")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    TextField("Build", text: $bundleVersion)
+                }
+            }
+        }
+        .padding()
+        .modifier(GlassBackground())
+    }
+    
+    private var arcadePatchCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Auto Patches")
+                    .font(.headline)
+            }
+            
+            Divider()
+            
+            Button(action: {
+                applyArcadePatch()
+            }) {
+                HStack {
+                    Image(systemName: isArcadePatched ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(isArcadePatched ? .green : .red)
+                    Text("Patch Arcade Game")
+                    Spacer()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .modifier(GlassBackground())
+    }
+    
+    private var actionsCard: some View {
+        Section() {
+            Button("Edit Raw Info.plist") {
+                prepareRawPlistEditor()
+            }
+            
+            Button("Save Changes") {
+                saveChanges()
+            }
+            .foregroundColor(.green)
+            
+            if modifiedIpaURL != nil {
+                Button("Share Modified IPA") {
+                    isShowingShareSheet = true
+                }
+                .foregroundColor(.green)
+            }
+            
+            Button("Start Over") {
+                resetState()
+            }
+            .foregroundColor(.red)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .modifier(GlassBackground())
+    }
+    
+    private var outputLogCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .foregroundColor(.accentColor)
+                Text("Output Log")
+                    .font(.headline)
+            }
+            
+            Divider()
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(outputMessages, id: \.self) { message in
+                        Text(message)
+                            .font(.system(.footnote, design: .monospaced))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 200)
+        }
+        .padding()
+        .modifier(GlassBackground())
     }
     
     func prepareRawPlistEditor() {
@@ -375,48 +500,64 @@ struct ContentView: View {
         guard let ipaURL = ipaURL else { return }
         
         isLoading = true
+        processingProgress = 0
+        processingStage = "Preparing..."
         addOutputMessage("Processing IPA file: \(ipaURL.lastPathComponent)")
         
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-                try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+                guard ipaURL.pathExtension.lowercased() == "ipa" else {
+                    throw ProcessingError.invalidIPA
+                }
                 
+                processingProgress = 0.2
+                processingStage = "Extracting IPA..."
+                
+                let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
                 try FileManager.default.unzipItem(at: ipaURL, to: tempDir)
                 
-                let payloadDir = tempDir.appendingPathComponent("Payload", isDirectory: true)
+                processingProgress = 0.4
+                processingStage = "Locating app bundle..."
                 
-                guard let appDirs = try? FileManager.default.contentsOfDirectory(at: payloadDir, includingPropertiesForKeys: nil) else {
-                    throw NSError(domain: "ModMyPlist", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not find app directory in Payload folder"])
+                let payloadDir = tempDir.appendingPathComponent("Payload")
+                guard let appDirs = try? FileManager.default.contentsOfDirectory(at: payloadDir, includingPropertiesForKeys: nil),
+                      let appDir = appDirs.first(where: { $0.pathExtension == "app" }) else {
+                    throw ProcessingError.extractionFailed
                 }
                 
-                guard let appDir = appDirs.first(where: { $0.pathExtension == "app" }) else {
-                    throw NSError(domain: "ModMyPlist", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not find .app directory in Payload folder"])
-                }
+                processingProgress = 0.6
+                processingStage = "Reading Info.plist..."
                 
                 let plistURL = appDir.appendingPathComponent("Info.plist")
-                
                 guard let plistDict = NSDictionary(contentsOf: plistURL) as? [String: Any] else {
-                    throw NSError(domain: "ModMyPlist", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not read Info.plist"])
+                    throw ProcessingError.invalidInfoPlist
                 }
+                
+                processingProgress = 0.8
+                processingStage = "Loading data..."
                 
                 DispatchQueue.main.async {
                     extractedPath = tempDir
-                    plistData = plistDict
+                    self.plistData = plistDict
                     
                     bundleIdentifier = plistDict["CFBundleIdentifier"] as? String ?? ""
                     bundleName = plistDict["CFBundleName"] as? String ?? ""
                     bundleVersion = plistDict["CFBundleVersion"] as? String ?? ""
                     bundleShortVersion = plistDict["CFBundleShortVersionString"] as? String ?? ""
                     
+                    processingProgress = 1.0
+                    processingStage = "Complete"
                     isLoading = false
+                    addOutputMessage("IPA processed successfully")
                 }
             } catch {
                 DispatchQueue.main.async {
-                    errorMessage = "Error processing IPA: \(error.localizedDescription)"
+                    errorMessage = error.localizedDescription
                     showError = true
                     self.ipaURL = nil
                     isLoading = false
+                    addOutputMessage("Error: \(error.localizedDescription)")
                 }
             }
         }
