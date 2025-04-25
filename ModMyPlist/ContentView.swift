@@ -73,10 +73,6 @@ struct ContentView: View {
     @State private var bundleVersion = ""
     @State private var bundleShortVersion = ""
     
-    @State private var entitlementsData: [String: Any]?
-    @State private var isEditingEntitlements = false
-    @State private var rawEntitlementsText = ""
-    
     @StateObject private var settings = Settings()
     @State private var isShowingSettings = false
     @State private var outputMessages: [String] = []
@@ -92,8 +88,8 @@ struct ContentView: View {
     var isArcadePatched: Bool {
         guard let plistData = plistData,
               let arcadeValue = plistData["NSApplicationRequiresArcade"] as? Bool else {
-                  return false
-              }
+            return false
+        }
         return !arcadeValue
     }
     
@@ -106,14 +102,11 @@ struct ContentView: View {
                     loadingView
                 } else if isEditingRawPlist {
                     rawPlistEditorView
-                } else if isEditingEntitlements {
-                    entitlementsEditorView
                 } else if plistData != nil {
                     ScrollView {
                         VStack(spacing: 20) {
                             ipaInfoCard
                             bundleInfoCard
-                            entitlementsCard
                             if hasArcadeKey {
                                 arcadePatchCard
                             }
@@ -443,105 +436,6 @@ struct ContentView: View {
         .modifier(GlassBackground())
     }
     
-    private var entitlementsEditorView: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Edit Entitlements")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                Spacer()
-                Button(action: { isEditingEntitlements = false }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.gray)
-                        .imageScale(.large)
-                }
-            }
-            .padding()
-            .background(Color(UIColor.systemBackground))
-            
-            ScrollView {
-                VStack(alignment: .leading) {
-                    Text("Raw XML")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
-                    
-                    TextEditor(text: $rawEntitlementsText)
-                        .font(.system(size: 14, design: .monospaced))
-                        .frame(minHeight: 300)
-                        .padding(8)
-                        .background(Color(UIColor.systemGray6))
-                        .cornerRadius(8)
-                        .padding(.horizontal)
-                    
-                    Text("Warning: Modifying entitlements may require re-signing")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                        .padding(.horizontal)
-                }
-            }
-            .padding(.vertical)
-            
-            Divider()
-            
-            HStack(spacing: 16) {
-                Button(action: { isEditingEntitlements = false }) {
-                    Text("Cancel")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                }
-                .buttonStyle(.bordered)
-                .tint(.red)
-                
-                Button(action: {
-                    saveEntitlements()
-                    isEditingEntitlements = false
-                }) {
-                    Text("Save Changes")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding()
-        }
-    }
-    
-    private var entitlementsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "key.fill")
-                    .foregroundColor(.orange)
-                Text("Entitlements")
-                    .font(.headline)
-            }
-            
-            Divider()
-            
-            if let entitlements = entitlementsData {
-                ForEach(Array(entitlements.keys.sorted()), id: \.self) { key in
-                    HStack {
-                        Text(key)
-                            .font(.system(.caption, design: .monospaced))
-                        Spacer()
-                        Text(String(describing: entitlements[key] ?? ""))
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Button("Edit Entitlements") {
-                    isEditingEntitlements = true
-                }
-                .padding(.top)
-            } else {
-                Text("No entitlements found")
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding()
-        .modifier(GlassBackground())
-    }
-    
     func prepareRawPlistEditor() {
         guard let plistData = plistData else { return }
         
@@ -629,8 +523,8 @@ struct ContentView: View {
                 let payloadDir = tempDir.appendingPathComponent("Payload")
                 guard let appDirs = try? FileManager.default.contentsOfDirectory(at: payloadDir, includingPropertiesForKeys: nil),
                       let appDir = appDirs.first(where: { $0.pathExtension == "app" }) else {
-                          throw ProcessingError.extractionFailed
-                      }
+                    throw ProcessingError.extractionFailed
+                }
                 
                 processingProgress = 0.6
                 processingStage = "Reading Info.plist..."
@@ -646,8 +540,6 @@ struct ContentView: View {
                 DispatchQueue.main.async {
                     extractedPath = tempDir
                     self.plistData = plistDict
-                    
-                    loadEntitlements(from: appDir)
                     
                     bundleIdentifier = plistDict["CFBundleIdentifier"] as? String ?? ""
                     bundleName = plistDict["CFBundleName"] as? String ?? ""
@@ -762,58 +654,6 @@ struct ContentView: View {
             return "Applying patch..."
         }
         return "Processing..."
-    }
-    
-    func loadEntitlements(from appDir: URL) {
-        do {
-            let codeSignatureURL = appDir.appendingPathComponent("_CodeSignature/CodeResources")
-            if let codeSignatureData = try? Data(contentsOf: codeSignatureURL),
-               let plist = try PropertyListSerialization.propertyList(from: codeSignatureData, options: [], format: nil) as? [String: Any] {
-                
-                if let files = plist["files2"] as? [String: Any] {
-                    self.entitlementsData = files
-                    
-                    let xmlData = try PropertyListSerialization.data(fromPropertyList: files, format: .xml, options: 0)
-                    if let xmlString = String(data: xmlData, encoding: .utf8) {
-                        self.rawEntitlementsText = xmlString
-                        addOutputMessage("Code signature data loaded successfully")
-                    }
-                } else {
-                    addOutputMessage("No code signature data found")
-                }
-            } else {
-                addOutputMessage("No code signature information available")
-            }
-        } catch {
-            errorMessage = "Error loading code signature: \(error.localizedDescription)"
-            showError = true
-            addOutputMessage("Failed to load code signature: \(error.localizedDescription)")
-        }
-    }
-
-    func saveEntitlements() {
-        guard let extractedPath = extractedPath,
-              let entitlements = entitlementsData else { return }
-        
-        do {
-            let payloadDir = extractedPath.appendingPathComponent("Payload")
-            let appDirs = try FileManager.default.contentsOfDirectory(at: payloadDir, includingPropertiesForKeys: nil)
-            guard let appDir = appDirs.first(where: { $0.pathExtension == "app" }) else { return }
-            
-            let codeSignatureURL = appDir.appendingPathComponent("_CodeSignature/CodeResources")
-            var codeSignaturePlist = try PropertyListSerialization.propertyList(from: Data(contentsOf: codeSignatureURL), options: [], format: nil) as? [String: Any] ?? [:]
-            
-            codeSignaturePlist["files2"] = entitlements
-            
-            let plistData = try PropertyListSerialization.data(fromPropertyList: codeSignaturePlist, format: .xml, options: 0)
-            try plistData.write(to: codeSignatureURL)
-            
-            addOutputMessage("Code signature updated successfully")
-        } catch {
-            errorMessage = "Error saving code signature: \(error.localizedDescription)"
-            showError = true
-            addOutputMessage("Failed to save code signature: \(error.localizedDescription)")
-        }
     }
 }
 
